@@ -5,6 +5,10 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
 function splitText(el, mode) {
   const text = (el.textContent || "").trim();
   if (!text) return;
