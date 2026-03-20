@@ -444,7 +444,11 @@ function initEmbers() {
   });
 
   renderer.setClearColor(0x000000, 0);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  let pixelRatioCap = 2;
+  const setPixelRatioCap = (cap) => {
+    pixelRatioCap = cap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioCap));
+  };
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 80);
@@ -617,29 +621,32 @@ function initEmbers() {
 
   const texture = createEmberTexture();
 
-  const count = prefersReducedMotion ? 240 : 1400;
   const radius = 18;
   const height = 22;
 
-  const positions = new Float32Array(count * 3);
-  const speeds = new Float32Array(count);
-  const scales = new Float32Array(count);
-  const phases = new Float32Array(count);
+  const buildParticles = (count) => {
+    const positions = new Float32Array(count * 3);
+    const speeds = new Float32Array(count);
+    const scales = new Float32Array(count);
+    const phases = new Float32Array(count);
 
-  for (let i = 0; i < count; i += 1) {
-    const i3 = i * 3;
-    positions[i3 + 0] = (Math.random() - 0.5) * radius;
-    positions[i3 + 1] = (Math.random() - 0.5) * height;
-    positions[i3 + 2] = (Math.random() - 0.5) * radius;
-    speeds[i] = 0.12 + Math.random() * 0.55;
-    scales[i] = 0.35 + Math.random() * 1.15;
-    phases[i] = Math.random() * Math.PI * 2;
-  }
+    for (let i = 0; i < count; i += 1) {
+      const i3 = i * 3;
+      positions[i3 + 0] = (Math.random() - 0.5) * radius;
+      positions[i3 + 1] = (Math.random() - 0.5) * height;
+      positions[i3 + 2] = (Math.random() - 0.5) * radius;
+      speeds[i] = 0.12 + Math.random() * 0.55;
+      scales[i] = 0.35 + Math.random() * 1.15;
+      phases[i] = Math.random() * Math.PI * 2;
+    }
 
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("aScale", new THREE.BufferAttribute(scales, 1));
-  geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("aScale", new THREE.BufferAttribute(scales, 1));
+    geometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+
+    return { count, geometry, speeds, phases, radius, height };
+  };
 
   const material = new THREE.ShaderMaterial({
     transparent: true,
@@ -680,7 +687,9 @@ function initEmbers() {
     `,
   });
 
-  const points = new THREE.Points(geometry, material);
+  let particles = buildParticles(prefersReducedMotion ? 240 : 1400);
+
+  const points = new THREE.Points(particles.geometry, material);
   points.renderOrder = 2;
   scene.add(points);
 
@@ -698,16 +707,58 @@ function initEmbers() {
 
   let composer = null;
   let bloomPass = null;
+  let bloomScale = 1;
 
-  if (!prefersReducedMotion) {
+  const ensureComposer = () => {
+    if (composer) return;
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
     bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), rig.bloomStrength, rig.bloomRadius, rig.bloomThreshold);
-    bloomPass.strength = rig.bloomStrength;
-    bloomPass.radius = rig.bloomRadius;
-    bloomPass.threshold = rig.bloomThreshold;
     composer.addPass(bloomPass);
-  }
+  };
+
+  const disposeComposer = () => {
+    composer?.dispose?.();
+    composer = null;
+    bloomPass = null;
+  };
+
+  const perfTiers = [
+    { name: "ultraLow", count: 240, pixelRatio: 1, bloom: false, bloomScale: 0 },
+    { name: "low", count: 420, pixelRatio: 1.15, bloom: true, bloomScale: 0.72 },
+    { name: "med", count: 850, pixelRatio: 1.5, bloom: true, bloomScale: 0.9 },
+    { name: "high", count: 1400, pixelRatio: 2, bloom: true, bloomScale: 1 },
+  ];
+
+  const pickInitialTier = () => {
+    if (prefersReducedMotion) return "ultraLow";
+    const hc = navigator.hardwareConcurrency || 8;
+    const dm = navigator.deviceMemory || 8;
+    if (hc <= 4 || dm <= 4) return "low";
+    if (hc <= 6 || dm <= 6) return "med";
+    return "high";
+  };
+
+  let tierName = pickInitialTier();
+
+  const applyTier = (nextTierName) => {
+    const cfg = perfTiers.find((t) => t.name === nextTierName) || perfTiers[perfTiers.length - 1];
+    tierName = cfg.name;
+    bloomScale = cfg.bloomScale;
+    setPixelRatioCap(cfg.pixelRatio);
+
+    if (cfg.bloom) ensureComposer();
+    else disposeComposer();
+
+    if (particles.count !== cfg.count) {
+      const prev = particles;
+      particles = buildParticles(cfg.count);
+      points.geometry = particles.geometry;
+      prev.geometry.dispose();
+    }
+  };
+
+  applyTier(tierName);
 
   const resize = () => {
     const w = window.innerWidth;
@@ -715,7 +766,8 @@ function initEmbers() {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    resolution.set(w * Math.min(window.devicePixelRatio || 1, 2), h * Math.min(window.devicePixelRatio || 1, 2));
+    const pr = Math.min(window.devicePixelRatio || 1, pixelRatioCap);
+    resolution.set(w * pr, h * pr);
     composer?.setSize(w, h);
     bloomPass?.setSize(w, h);
   };
@@ -724,6 +776,9 @@ function initEmbers() {
 
   let rafId = 0;
   let last = performance.now();
+  let fpsEma = 60;
+  let lastTierChange = performance.now();
+  let highStableFor = 0;
   let mouseX = 0;
   let mouseY = 0;
 
@@ -738,6 +793,29 @@ function initEmbers() {
     const dt = Math.min(0.06, (now - last) / 1000);
     last = now;
 
+    if (!prefersReducedMotion && dt > 0) {
+      const fps = 1 / dt;
+      fpsEma = fpsEma * 0.95 + fps * 0.05;
+
+      const tierIdx = perfTiers.findIndex((t) => t.name === tierName);
+      if (now - lastTierChange > 4500) {
+        if (fpsEma < 48 && tierIdx > 0) {
+          applyTier(perfTiers[tierIdx - 1].name);
+          lastTierChange = now;
+          highStableFor = 0;
+        } else if (fpsEma > 58 && tierIdx < perfTiers.length - 1) {
+          highStableFor += dt;
+          if (highStableFor > 6) {
+            applyTier(perfTiers[tierIdx + 1].name);
+            lastTierChange = now;
+            highStableFor = 0;
+          }
+        } else {
+          highStableFor = 0;
+        }
+      }
+    }
+
     const t = now / 1000;
     material.uniforms.uTime.value = t;
     material.uniforms.uIntensity.value = rig.emberIntensity;
@@ -747,8 +825,8 @@ function initEmbers() {
     topoMat.opacity = rig.topoOpacity;
     warm.material.opacity = rig.warm;
     if (bloomPass) {
-      bloomPass.strength = rig.bloomStrength;
-      bloomPass.radius = rig.bloomRadius;
+      bloomPass.strength = rig.bloomStrength * bloomScale;
+      bloomPass.radius = rig.bloomRadius * bloomScale;
       bloomPass.threshold = rig.bloomThreshold;
     }
 
@@ -767,17 +845,17 @@ function initEmbers() {
     }
     topoPos.needsUpdate = true;
 
-    const pos = geometry.attributes.position;
-    for (let i = 0; i < count; i += 1) {
+    const pos = particles.geometry.attributes.position;
+    for (let i = 0; i < particles.count; i += 1) {
       const i3 = i * 3;
-      pos.array[i3 + 1] += speeds[i] * dt;
-      pos.array[i3 + 0] += Math.sin(phases[i] + now * 0.0006) * dt * 0.06;
-      pos.array[i3 + 2] += Math.cos(phases[i] + now * 0.00055) * dt * 0.05;
+      pos.array[i3 + 1] += particles.speeds[i] * dt;
+      pos.array[i3 + 0] += Math.sin(particles.phases[i] + now * 0.0006) * dt * 0.06;
+      pos.array[i3 + 2] += Math.cos(particles.phases[i] + now * 0.00055) * dt * 0.05;
       if (pos.array[i3 + 1] > height * 0.5) {
         pos.array[i3 + 1] = -height * 0.5;
         pos.array[i3 + 0] = (Math.random() - 0.5) * radius;
         pos.array[i3 + 2] = (Math.random() - 0.5) * radius;
-        speeds[i] = 0.12 + Math.random() * 0.55;
+        particles.speeds[i] = 0.12 + Math.random() * 0.55;
       }
     }
     pos.needsUpdate = true;
@@ -820,14 +898,14 @@ function initEmbers() {
     window.removeEventListener("resize", resize);
     window.removeEventListener("pointermove", onMove);
     document.removeEventListener("visibilitychange", onVis);
-    geometry.dispose();
+    particles.geometry.dispose();
     material.dispose();
     if (texture) texture.dispose();
     topoGeo.dispose();
     topoMat.dispose();
     firePlane.geometry.dispose();
     fireMaterial.dispose();
-    composer?.dispose?.();
+    disposeComposer();
     renderer.dispose();
   };
 
