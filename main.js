@@ -253,6 +253,7 @@ function initGSAP(sceneCtx) {
               const p = self.progress;
               const idx = Math.min(2, Math.floor(p * 3));
               setHudActive(idx);
+              if (hud) hud.style.setProperty("--chapters-p", String(p));
             },
           },
           defaults: { ease: "none" },

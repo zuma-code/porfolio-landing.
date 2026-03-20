@@ -648,6 +648,7 @@ body.cursor-hot #cursor {
   opacity: 0;
   transform: translate3d(0, 10px, 0);
   transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out);
+  --chapters-p: 0;
 }
 
 body.chapters-on #chaptersHud {
@@ -661,6 +662,24 @@ body.chapters-on #chaptersHud {
   text-transform: uppercase;
   color: rgba(245, 245, 245, 0.55);
   margin-bottom: 10px;
+}
+
+.chaptersHud-progress {
+  width: 148px;
+  height: 1px;
+  background: rgba(245, 245, 245, 0.14);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.chaptersHud-progressFill {
+  width: 100%;
+  height: 100%;
+  transform-origin: 0% 50%;
+  transform: scaleX(var(--chapters-p));
+  background: linear-gradient(90deg, rgba(243, 156, 18, 0.92), rgba(231, 76, 60, 0.35));
+  filter: drop-shadow(0 0 14px rgba(243, 156, 18, 0.18));
 }
 
 .chaptersHud-steps {
