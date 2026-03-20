@@ -1,4 +1,7 @@
 import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -214,21 +217,123 @@ function initGSAP(sceneCtx) {
     if (sceneCtx?.rig) {
       const rig = sceneCtx.rig;
 
-      gsap.to(rig, {
-        scroll: 1,
-        scrollTrigger: {
-          trigger: "#top",
-          start: "top top",
-          end: "bottom top",
-          scrub: true,
-        },
-      });
+      if (!prefersReducedMotion) {
+        const hud = document.getElementById("chaptersHud");
+        const hudSteps = hud ? Array.from(hud.querySelectorAll(".chaptersHud-step")) : [];
+        const setHudActive = (idx) => {
+          if (!hudSteps.length) return;
+          for (let i = 0; i < hudSteps.length; i += 1) {
+            hudSteps[i].classList.toggle("is-active", i === idx);
+          }
+        };
+
+        const chapters = gsap.timeline({
+          scrollTrigger: {
+            trigger: "#top",
+            start: "top top",
+            end: "+=240%",
+            scrub: true,
+            pin: true,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+            onEnter: () => {
+              if (hud) document.body.classList.add("chapters-on");
+            },
+            onEnterBack: () => {
+              if (hud) document.body.classList.add("chapters-on");
+            },
+            onLeave: () => {
+              if (hud) document.body.classList.remove("chapters-on");
+            },
+            onLeaveBack: () => {
+              if (hud) document.body.classList.remove("chapters-on");
+            },
+            onUpdate: (self) => {
+              if (!hudSteps.length) return;
+              const p = self.progress;
+              const idx = Math.min(2, Math.floor(p * 3));
+              setHudActive(idx);
+            },
+          },
+          defaults: { ease: "none" },
+        });
+
+        chapters
+          .to(
+            rig,
+            {
+              scroll: 0.65,
+              x: 0.25,
+              y: -0.22,
+              z: 15.25,
+              lookX: 0,
+              lookY: -0.08,
+              lookZ: 0,
+              fireIntensity: 0.56,
+              emberIntensity: 1.08,
+              topoOpacity: 0.075,
+              topoLift: 0.2,
+              topoTilt: 0.04,
+              warm: 0.04,
+              bloomStrength: 0.34,
+              bloomRadius: 0.26,
+              bloomThreshold: 0.72,
+            },
+            0,
+          )
+          .to(
+            rig,
+            {
+              scroll: 1.05,
+              x: -0.85,
+              y: 0.28,
+              z: 14.35,
+              lookX: 0.18,
+              lookY: -0.42,
+              lookZ: 0,
+              fireIntensity: 0.62,
+              emberIntensity: 1.14,
+              topoOpacity: 0.12,
+              topoLift: 0.85,
+              topoTilt: 0.12,
+              warm: 0.055,
+              bloomStrength: 0.52,
+              bloomRadius: 0.34,
+              bloomThreshold: 0.66,
+            },
+            0.36,
+          )
+          .to(rig, { shake: 0.7, duration: 0.035 }, 0.52)
+          .to(rig, { shake: 0.0, duration: 0.09 }, 0.56)
+          .to(
+            rig,
+            {
+              scroll: 1.35,
+              x: 1.15,
+              y: -0.55,
+              z: 14.4,
+              lookX: 0,
+              lookY: -0.35,
+              lookZ: 0,
+              fireIntensity: 0.5,
+              emberIntensity: 1.1,
+              topoOpacity: 0.095,
+              topoLift: 0.55,
+              topoTilt: 0.06,
+              warm: 0.06,
+              bloomStrength: 0.42,
+              bloomRadius: 0.3,
+              bloomThreshold: 0.7,
+            },
+            0.72,
+          );
+      }
 
       gsap.to(rig, {
         scroll: 2,
         scrollTrigger: {
           trigger: "#arsenal",
-          start: "top bottom",
+          start: "top top",
           end: "bottom top",
           scrub: true,
         },
@@ -238,7 +343,7 @@ function initGSAP(sceneCtx) {
         scroll: 3,
         scrollTrigger: {
           trigger: "#contact",
-          start: "top bottom",
+          start: "top top",
           end: "bottom top",
           scrub: true,
         },
@@ -254,7 +359,12 @@ function initGSAP(sceneCtx) {
         fireIntensity: 0.48,
         emberIntensity: 1.08,
         topoOpacity: 0.085,
+        topoLift: 0.55,
+        topoTilt: 0.06,
         warm: 0.06,
+        bloomStrength: 0.42,
+        bloomRadius: 0.3,
+        bloomThreshold: 0.7,
         scrollTrigger: {
           trigger: "#arsenal",
           start: "top 92%",
@@ -273,7 +383,12 @@ function initGSAP(sceneCtx) {
         fireIntensity: 0.62,
         emberIntensity: 1.18,
         topoOpacity: 0.1,
+        topoLift: 1.05,
+        topoTilt: 0.14,
         warm: 0.085,
+        bloomStrength: 0.58,
+        bloomRadius: 0.36,
+        bloomThreshold: 0.64,
         scrollTrigger: {
           trigger: "#contact",
           start: "top 92%",
@@ -340,7 +455,13 @@ function initEmbers() {
     fireIntensity: 0.38,
     emberIntensity: 1.0,
     topoOpacity: 0.06,
+    topoLift: 0,
+    topoTilt: 0,
     warm: 0.02,
+    bloomStrength: 0.32,
+    bloomRadius: 0.26,
+    bloomThreshold: 0.72,
+    shake: 0,
     scroll: 0,
   };
 
@@ -460,8 +581,10 @@ function initEmbers() {
     opacity: rig.topoOpacity,
   });
   const topo = new THREE.Mesh(topoGeo, topoMat);
-  topo.rotation.x = -0.98;
-  topo.position.set(0, -6.2, -14.5);
+  const topoBaseRotX = -0.98;
+  const topoBaseY = -6.2;
+  topo.rotation.x = topoBaseRotX;
+  topo.position.set(0, topoBaseY, -14.5);
   topo.renderOrder = 1;
   scene.add(topo);
 
@@ -568,6 +691,19 @@ function initEmbers() {
   warm.renderOrder = 3;
   scene.add(warm);
 
+  let composer = null;
+  let bloomPass = null;
+
+  if (!prefersReducedMotion) {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), rig.bloomStrength, rig.bloomRadius, rig.bloomThreshold);
+    bloomPass.strength = rig.bloomStrength;
+    bloomPass.radius = rig.bloomRadius;
+    bloomPass.threshold = rig.bloomThreshold;
+    composer.addPass(bloomPass);
+  }
+
   const resize = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -575,6 +711,8 @@ function initEmbers() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     resolution.set(w * Math.min(window.devicePixelRatio || 1, 2), h * Math.min(window.devicePixelRatio || 1, 2));
+    composer?.setSize(w, h);
+    bloomPass?.setSize(w, h);
   };
   resize();
   window.addEventListener("resize", resize, { passive: true });
@@ -603,6 +741,14 @@ function initEmbers() {
     fireMaterial.uniforms.uScroll.value = rig.scroll;
     topoMat.opacity = rig.topoOpacity;
     warm.material.opacity = rig.warm;
+    if (bloomPass) {
+      bloomPass.strength = rig.bloomStrength;
+      bloomPass.radius = rig.bloomRadius;
+      bloomPass.threshold = rig.bloomThreshold;
+    }
+
+    topo.position.y = topoBaseY + rig.topoLift;
+    topo.rotation.x = topoBaseRotX + rig.topoTilt;
 
     topo.rotation.z = Math.sin(t * 0.22) * 0.06;
     for (let i = 0; i < topoPos.count; i += 1) {
@@ -636,9 +782,20 @@ function initEmbers() {
     camera.position.x += (tx - camera.position.x) * 0.04;
     camera.position.y += (ty - camera.position.y) * 0.04;
     camera.position.z += (rig.z - camera.position.z) * 0.03;
-    camera.lookAt(rig.lookX, rig.lookY, rig.lookZ);
+    const shake = rig.shake;
+    if (shake > 0.0001) {
+      const s = shake * 0.085;
+      const sx = (Math.sin(t * 18.3) + Math.sin(t * 29.7)) * 0.5 * s;
+      const sy = (Math.cos(t * 21.2) + Math.sin(t * 31.4)) * 0.5 * s * 0.75;
+      camera.position.x += sx;
+      camera.position.y += sy;
+      camera.lookAt(rig.lookX + sx * 0.12, rig.lookY + sy * 0.12, rig.lookZ);
+    } else {
+      camera.lookAt(rig.lookX, rig.lookY, rig.lookZ);
+    }
 
-    renderer.render(scene, camera);
+    if (composer) composer.render();
+    else renderer.render(scene, camera);
     rafId = requestAnimationFrame(animate);
   };
 
@@ -665,6 +822,7 @@ function initEmbers() {
     topoMat.dispose();
     firePlane.geometry.dispose();
     fireMaterial.dispose();
+    composer?.dispose?.();
     renderer.dispose();
   };
 
