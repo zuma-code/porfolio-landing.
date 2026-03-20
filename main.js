@@ -48,6 +48,111 @@ function initSplit() {
   }
 }
 
+function initTitleInterface(sceneCtx) {
+  const title = document.querySelector(".hero-title");
+  if (!(title instanceof HTMLElement)) return;
+
+  const spans = Array.from(title.querySelectorAll("span")).filter((n) => n instanceof HTMLElement);
+  if (!spans.length) return;
+
+  let rects = [];
+  let px = window.innerWidth / 2;
+  let py = window.innerHeight / 2;
+  let gx = 0;
+  let tgx = 0;
+  let raf = 0;
+  let active = false;
+
+  const measure = () => {
+    rects = spans.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { el, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    });
+  };
+
+  const apply = () => {
+    raf = 0;
+    if (!active) return;
+    gx += (tgx - gx) * 0.16;
+    title.style.setProperty("--gx", `${(gx * 100).toFixed(2)}%`);
+
+    const radius = 180;
+    for (const { el, cx, cy } of rects) {
+      const dx = px - cx;
+      const dy = py - cy;
+      const d = Math.hypot(dx, dy);
+      const f = Math.max(0, 1 - d / radius);
+      const e = f * f;
+      el.style.setProperty("--lift", String(-12 * e));
+      el.style.setProperty("--g", String(e));
+    }
+
+    raf = requestAnimationFrame(apply);
+  };
+
+  const onMove = (e) => {
+    const r = title.getBoundingClientRect();
+    px = e.clientX;
+    py = e.clientY;
+    tgx = r.width > 0 ? Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) : 0.5;
+    if (!active) {
+      active = true;
+      measure();
+      raf = requestAnimationFrame(apply);
+    }
+  };
+
+  const clear = () => {
+    active = false;
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    for (const { el } of rects) {
+      el.style.setProperty("--lift", "0");
+      el.style.setProperty("--g", "0");
+    }
+  };
+
+  const glitch = () => {
+    if (!window.gsap) return;
+    window.gsap.killTweensOf(spans);
+    spans.forEach((el) => {
+      const jx = `${(Math.random() * 4 - 2).toFixed(2)}px`;
+      const jy = `${(Math.random() * 4 - 2).toFixed(2)}px`;
+      el.style.setProperty("--jx", jx);
+      el.style.setProperty("--jy", jy);
+    });
+    window.gsap.to(spans, { "--jx": "0px", "--jy": "0px", duration: 0.12, ease: "power2.out", stagger: 0.004 });
+  };
+
+  const ignite = () => {
+    sceneCtx?.ignite?.();
+    glitch();
+  };
+
+  title.addEventListener("pointermove", onMove, { passive: true });
+  title.addEventListener("pointerleave", clear, { passive: true });
+  window.addEventListener("resize", measure, { passive: true });
+
+  title.addEventListener("click", ignite);
+  title.addEventListener("focus", glitch);
+  title.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      ignite();
+    }
+  });
+
+  if (!window.matchMedia("(hover: hover)").matches) {
+    const onScroll = () => {
+      const r = title.getBoundingClientRect();
+      const p = Math.min(1, Math.max(0, 1 - r.top / Math.max(window.innerHeight, 1)));
+      title.style.setProperty("--gx", `${(p * 100).toFixed(2)}%`);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+}
+
 function initCursor() {
   if (prefersReducedMotion) return;
 
@@ -224,6 +329,50 @@ function initGSAP(sceneCtx) {
       if (!prefersReducedMotion) {
         const hud = document.getElementById("chaptersHud");
         const hudSteps = hud ? Array.from(hud.querySelectorAll(".chaptersHud-step")) : [];
+        const title = document.querySelector(".hero-title");
+        const titleSpans = title ? Array.from(title.querySelectorAll("span")) : [];
+
+        const glitchTitle = () => {
+          if (!window.gsap || !titleSpans.length) return;
+          gsap.killTweensOf(titleSpans);
+          titleSpans.forEach((el) => {
+            el.style.setProperty("--jx", `${(Math.random() * 4 - 2).toFixed(2)}px`);
+            el.style.setProperty("--jy", `${(Math.random() * 4 - 2).toFixed(2)}px`);
+          });
+          gsap.to(titleSpans, { "--jx": "0px", "--jy": "0px", duration: 0.12, ease: "power2.out", stagger: 0.004 });
+        };
+
+        const snapHud = (idx) => {
+          if (!hud) return;
+          const step = hudSteps[idx];
+          const tick = step ? step.querySelector(".chaptersHud-tick") : null;
+          const fill = hud.querySelector(".chaptersHud-progressFill");
+
+          gsap.killTweensOf(hud);
+          gsap.fromTo(
+            hud,
+            { scale: 1, filter: "drop-shadow(0 0 0 rgba(0,0,0,0))" },
+            {
+              scale: 1.018,
+              filter: "drop-shadow(0 0 18px rgba(243,156,18,0.14)) drop-shadow(0 0 32px rgba(231,76,60,0.08))",
+              duration: 0.12,
+              yoyo: true,
+              repeat: 1,
+              ease: "power2.out",
+            },
+          );
+
+          if (tick) {
+            gsap.killTweensOf(tick);
+            gsap.fromTo(tick, { scaleX: 1 }, { scaleX: 1.06, duration: 0.11, yoyo: true, repeat: 1, ease: "power2.out" });
+          }
+
+          if (fill) {
+            gsap.killTweensOf(fill);
+            gsap.fromTo(fill, { opacity: 0.95 }, { opacity: 1, duration: 0.1, yoyo: true, repeat: 1, ease: "power1.out" });
+          }
+        };
+
         const setHudActive = (idx) => {
           if (!hudSteps.length) return;
           for (let i = 0; i < hudSteps.length; i += 1) {
@@ -258,6 +407,7 @@ function initGSAP(sceneCtx) {
               const idx = Math.min(2, Math.floor(p * 3));
               setHudActive(idx);
               if (hud) hud.style.setProperty("--chapters-p", String(p));
+              if (title) title.style.setProperty("--gx", `${(p * 100).toFixed(2)}%`);
             },
           },
           defaults: { ease: "none" },
@@ -286,6 +436,10 @@ function initGSAP(sceneCtx) {
             },
             0,
           )
+          .call(() => {
+            snapHud(0);
+            glitchTitle();
+          }, [], 0.01)
           .to(
             rig,
             {
@@ -308,6 +462,10 @@ function initGSAP(sceneCtx) {
             },
             0.36,
           )
+          .call(() => {
+            snapHud(1);
+            glitchTitle();
+          }, [], 0.36)
           .to(rig, { shake: 0.7, duration: 0.035 }, 0.52)
           .to(rig, { shake: 0.0, duration: 0.09 }, 0.56)
           .to(
@@ -332,6 +490,10 @@ function initGSAP(sceneCtx) {
             },
             0.72,
           );
+        chapters.call(() => {
+          snapHud(2);
+          glitchTitle();
+        }, [], 0.72);
       }
 
       gsap.to(rig, {
@@ -451,6 +613,7 @@ function initEmbers() {
   };
 
   const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0a0a, 0.038);
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 80);
   camera.position.set(0, 0, 16);
 
@@ -596,6 +759,20 @@ function initEmbers() {
   topo.position.set(0, topoBaseY, -14.5);
   topo.renderOrder = 1;
   scene.add(topo);
+
+  const topoGlowMat = new THREE.MeshBasicMaterial({
+    color: 0xe74c3c,
+    wireframe: true,
+    transparent: true,
+    opacity: rig.topoOpacity * 0.55,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const topoGlow = new THREE.Mesh(topoGeo, topoGlowMat);
+  topoGlow.scale.setScalar(1.012);
+  topoGlow.position.z = -14.48;
+  topoGlow.renderOrder = 1;
+  scene.add(topoGlow);
 
   const topoPos = topoGeo.attributes.position;
   const topoBase = new Float32Array(topoPos.array);
@@ -823,6 +1000,12 @@ function initEmbers() {
     fireMaterial.uniforms.uIntensity.value = rig.fireIntensity;
     fireMaterial.uniforms.uScroll.value = rig.scroll;
     topoMat.opacity = rig.topoOpacity;
+
+    const topoPulse = 0.78 + 0.22 * Math.sin(t * 0.9 + rig.scroll * 1.1);
+    topoGlowMat.opacity = rig.topoOpacity * 0.55 * topoPulse;
+    topoGlow.position.copy(topo.position);
+    topoGlow.rotation.copy(topo.rotation);
+
     warm.material.opacity = rig.warm;
     if (bloomPass) {
       bloomPass.strength = rig.bloomStrength * bloomScale;
@@ -903,6 +1086,7 @@ function initEmbers() {
     if (texture) texture.dispose();
     topoGeo.dispose();
     topoMat.dispose();
+    topoGlowMat.dispose();
     firePlane.geometry.dispose();
     fireMaterial.dispose();
     disposeComposer();
@@ -914,6 +1098,7 @@ function initEmbers() {
 
 initSplit();
 const sceneCtx = initEmbers();
+initTitleInterface(sceneCtx);
 initCursor();
 initLenisAndScroll();
 initTiltCards();

@@ -145,6 +145,33 @@ a {
   margin: 0;
   font-size: clamp(54px, 10vw, 120px);
   text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hero-title:focus-visible {
+  outline-offset: 10px;
+}
+
+.hero-title.gradient-text {
+  animation: none;
+  background-position: var(--gx, 0%) 50%;
+}
+
+.hero-title.gradient-text.split > span {
+  background-position: var(--gx, 0%) 50%;
+}
+
+.hero-title.split > span {
+  --lift: 0;
+  --g: 0;
+  --jx: 0px;
+  --jy: 0px;
+  transform: translate3d(var(--jx), calc(var(--lift) * 1px + var(--jy)), 0);
+  filter: drop-shadow(0 0 calc(var(--g) * 18px) rgba(243, 156, 18, 0.38))
+    drop-shadow(0 0 calc(var(--g) * 10px) rgba(231, 76, 60, 0.22));
+  transition: transform 150ms var(--ease-out), filter 180ms var(--ease-out);
 }
 
 .gradient-text {
@@ -157,6 +184,7 @@ a {
     var(--flame-2)
   );
   background-size: 220% 220%;
+  background-position: 0% 50%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -670,6 +698,8 @@ body.cursor-hot #cursor {
   transform: translate3d(0, 10px, 0);
   transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out);
   --chapters-p: 0;
+  transform-origin: 0% 100%;
+  will-change: transform, filter;
 }
 
 body.chapters-on #chaptersHud {
