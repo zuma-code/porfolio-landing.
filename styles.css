@@ -177,19 +177,19 @@ a {
 .gradient-text {
   background: linear-gradient(
     120deg,
-    var(--fire-1),
-    var(--flame-1),
-    var(--ember),
-    var(--fire-2),
-    var(--flame-2)
+    var(--fire-2) 0%,
+    var(--fire-1) 28%,
+    var(--flame-1) 52%,
+    var(--fire-1) 74%,
+    var(--fire-2) 100%
   );
   background-size: 220% 220%;
   background-position: 0% 50%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 16px 40px rgba(231, 76, 60, 0.16))
-    drop-shadow(0 8px 22px rgba(243, 156, 18, 0.12));
+  filter: drop-shadow(0 16px 40px rgba(231, 76, 60, 0.18))
+    drop-shadow(0 8px 22px rgba(243, 156, 18, 0.1));
   animation: flameShift 6s var(--ease-out) infinite;
 }
 
@@ -600,7 +600,7 @@ a {
   letter-spacing: -0.03em;
   text-transform: uppercase;
   margin: 0;
-  background: linear-gradient(120deg, var(--fire-1), var(--flame-2), var(--ember));
+  background: linear-gradient(120deg, var(--fire-2), var(--fire-1), var(--flame-1));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
